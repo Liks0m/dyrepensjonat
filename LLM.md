@@ -354,3 +354,107 @@ How the data fits the business rules:
   Bella checks out, which the trigger allows because it compares with `<`.
 - Room types match the species. Simba's breed is `NULL` (mixed or unknown).
 - Simba and rooms 101 and 202 have no stays, which is allowed.
+
+## Review of the CRUD code in `sql.py` (`PetStay`)
+
+The idea is to add, change and delete stays with `PetStay` from Flask and an
+HTML form.
+
+### Bugs found in the first version
+
+- `INSERT INTO stays(...):` had a stray `:`, which is a SQL syntax error.
+- `({stay.pet}, {stay.room}, ...)` wrapped each value in `{}`, which makes a
+  Python *set*. MySQL can't convert a set. It should be `(self.pet, self.room, ...)`.
+- `cursor.lastrowid()` should be `cursor.lastrowid`. It's a value, not a function.
+- `class OverlappedStays(Exception):` had no body, so the whole file failed to
+  import (`IndentationError`). A class needs at least `pass` or a docstring.
+- `get_all_stays`: a missing comma after `r.room_type`, and `p.name` and `o.name`
+  both came back as `name`, so one overwrote the other. Fixed with
+  `AS pet_name` and `AS owner_name`.
+- `update()` had a stray `);` before `WHERE` and no `conn.commit()`.
+  mysql-connector doesn't save automatically, so the change was lost.
+- `db.py`: if the connection fails, `cnx` never gets a value, so you get
+  "cannot access local variable 'cnx'" instead of the real error.
+  Adding `raise` after the `print` calls shows the actual cause.
+
+### Class or plain functions?
+
+- A class that only stores four values so `add()` can read them back does
+  nothing a plain function couldn't. Now that `PetStay` has `add()`, `update()`
+  and `delete()`, it represents one stay and the class makes sense.
+- Use `self`, not another name like `stay`. Python allows it, but `self` is the standard.
+- `stay_id=None` as the last parameter: a new stay has no id yet (MySQL makes
+  one, and `add()` stores it with `self.id = cursor.lastrowid`). An existing
+  stay passes it in: `PetStay(..., stay_id=5)`.
+- **Normal methods vs. classmethods:** if the method needs one stay's data
+  (`add`, `update`, `delete`), it's a normal method with `self`. If there's no
+  stay object yet (finding one by id), it can be a `@classmethod` with `cls`.
+- `PetStay.get(stay_id)` is a classmethod that fetches one row and returns a
+  `PetStay` (or `None` if the id doesn't exist). It needs `conn.cursor(dictionary=True)`,
+  the tuple `(stay_id,)` with a comma, and `return cls(...)`.
+- `get_all_stays()` stays a plain function. It returns joined rows with pet
+  name, owner name and room number for the list page, not `PetStay` objects,
+  so it doesn't belong on the class.
+
+## Fixing and loading the overlap triggers
+
+- The insert trigger had been renamed to the update trigger instead of
+  copied, so new bookings weren't checked at all. `database.sql` now has both
+  `trg_stays_no_overlap_insert` and `trg_stays_no_overlap_update`.
+- The update trigger needs `AND s.stay_id <> NEW.stay_id`. Otherwise a stay
+  "overlaps" its own old version and almost every update is blocked, for
+  example making a stay one day longer.
+- **Changing `database.sql` doesn't change the database.** The file has to be
+  run again. After a reload, `SHOW CREATE TRIGGER dyrepensjonat.trg_stays_no_overlap_update;`
+  still showed the old version (without the `stay_id` line, created 15:16).
+  The new `CREATE TRIGGER` hadn't replaced it. Fix:
+  ```sql
+  USE dyrepensjonat;
+  DROP TRIGGER IF EXISTS trg_stays_no_overlap_update;
+  -- then run the CREATE TRIGGER ... END block from database.sql again
+  ```
+  Reloading the whole file also works, since it starts with `DROP DATABASE`.
+- The file must be loaded as an admin user (`ga`). `dp_app` only has
+  `SELECT, INSERT, UPDATE, DELETE`. That's good for the app, but it means
+  `dp_app` can't create triggers, and can't even *see* them in
+  `information_schema.TRIGGERS`.
+
+## Tests: `test_sql.py`
+
+pytest integration tests that run against the real MySQL database from `.env`
+(the `ga-mysql` Podman container on port 3306), so the triggers and the
+`CHECK` constraint are tested too. All test stays use rooms 101 and 202 in the
+year 2099, so they don't clash with the example data, and every stay a test
+creates is deleted afterwards. If the database can't be reached, the tests
+are skipped instead of failing.
+
+What they cover:
+- `add()` returns an id and sets `self.id`. `get()` returns the saved values,
+  or `None` for an unknown id.
+- Insert trigger: overlapping bookings raise `OverlappedStays`. Back-to-back
+  stays (check-in on the day of the last check-out) and the same dates in
+  another room are allowed.
+- `CHECK (check_out > check_in)`: backwards dates give a normal database
+  error, not `OverlappedStays`.
+- `update()`: changes are saved, a stay can be made longer, and moving it onto
+  another booking or into an occupied room raises `OverlappedStays` and keeps
+  the old values.
+- `delete()`: returns `True` and the stay is gone. Returns `False` for an
+  unknown id. The freed dates can be booked again.
+- `get_all_stays()`: a new stay shows up with the right pet name, owner name
+  and room number.
+
+Run with `pytest -v`.
+
+### Problems found while running them
+
+- `.env` had `DB_NAME=Dyrepensjonat`, but the database is `dyrepensjonat`.
+  MySQL on Linux (as in the container) treats these as different names, so
+  the connection got "Access denied". Fixed in `.env`.
+- The shell still had the old `DB_NAME` from direnv (`.envrc`), and
+  `load_dotenv()` never overwrites variables that already exist. Run
+  `direnv reload` or open a new terminal after changing `.env`.
+- First full run: 14 of 15 passed. `test_update_can_extend_own_stay` failed
+  because the database still had the old update trigger without
+  `s.stay_id <> NEW.stay_id` (see above).
+- After replacing the update trigger: **all 15 tests passed**.

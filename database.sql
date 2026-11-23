@@ -2,6 +2,14 @@ DROP DATABASE IF EXISTS dyrepensjonat;
 CREATE DATABASE dyrepensjonat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE dyrepensjonat;
 
+DROP TRIGGER IF EXISTS
+    trg_stays_no_overlap_insert;
+
+
+DROP TRIGGER IF EXISTS
+    trg_stays_no_overlap_update;
+
+
 CREATE TABLE owners
 (
     owner_id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
@@ -58,6 +66,24 @@ BEGIN
     END IF;
 END;
 
+CREATE TRIGGER trg_stays_no_overlap_update
+    BEFORE UPDATE
+    ON stays -- runs automatically before an existing stay is changed
+    FOR EACH ROW
+BEGIN
+    -- NEW = the row with its new values, s = stays already in the table
+    IF EXISTS (SELECT 1
+               FROM stays s
+               WHERE s.room_id = NEW.room_id    -- same room
+                 AND s.stay_id <> NEW.stay_id   -- skip the stay being updated (its old version is still in the table)
+                 AND s.check_in < NEW.check_out -- other stay starts before the updated one ends
+                 AND NEW.check_in < s.check_out -- updated stay starts before the other one ends
+    ) THEN
+        SIGNAL SQLSTATE '45000' -- raise an error, so the UPDATE is cancelled
+            SET MESSAGE_TEXT = 'Room is already occupied in this period';
+    END IF;
+END;
+
 
 -- ---------- Example data ----------
 
@@ -88,8 +114,3 @@ VALUES (1, 2, '2026-06-28', '2026-07-05'), -- Bella, summer holiday
        (2, 3, '2026-07-01', '2026-07-14'), -- Pus in the cat room
        (4, 5, '2026-10-10', '2026-10-13'), -- Luna, autumn break
        (1, 2, '2026-12-22', '2026-12-27'); -- Bella again, Christmas
-
-CREATE USER IF NOT EXISTS 'dp_app'@'%' IDENTIFIED BY 'gokstad-password123';
-GRANT SELECT, INSERT, UPDATE, DELETE ON dyrepensjonat.* TO 'dp_app'@'%';
-
-SHOW GRANTS FOR 'dp_app'@'%';
