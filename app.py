@@ -1,4 +1,6 @@
-import mysql.connector
-from mysql.connector import errorcode
+from dp_web import create_app
 
-from db import get_connection
+app = create_app()
+
+if __name__ == "__main__":
+    app.run(debug=True, port=5001)

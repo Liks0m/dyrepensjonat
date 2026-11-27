@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{#
+  Form for creating and editing a stay.
+
+  Variables this template uses:
+    edit_stay - (optional) a PetStay object; when set, the form edits that stay instead of creating one
+    pets      - list of dicts with pet_id, name, species (for a dropdown, otherwise a number field)
+    rooms     - list of dicts with room_id, room_number, room_type (same as above)
+
+  Rendered by:
+    stay.stay_create  GET, POST  /stay/new
+    stay.stay_edit    GET, POST  /stay/<stay_id>/edit
+#}
+
+{% set editing = edit_stay is defined and edit_stay %}
+
+{# After a failed POST (e.g. room already booked) keep what the user typed #}
+{% macro field(name, fallback) -%}
+    {{ request.form.get(name, fallback if fallback is not none else '') }}
+{%- endmacro %}
+
+{% block title %}{{ 'Edit stay' if editing else 'New stay' }}{% endblock %}
+
+{% block content %}
+    <section class="card" id="stay-form">
+        {% if editing %}
+            <h1>Edit stay #{{ edit_stay.id }}</h1>
+            {% set action = url_for('stay.stay_edit', stay_id=edit_stay.id) %}
+        {% else %}
+            <h1>New stay</h1>
+            {% set action = url_for('stay.stay_create') %}
+        {% endif %}
+
+        <form method="post" action="{{ action }}" class="form-grid">
+            {% set current_pet = field('pet_id', edit_stay.pet if editing else '') %}
+            {% set current_room = field('room_id', edit_stay.room if editing else '') %}
+
+            <label>
+                Pet
+                {% if pets %}
+                    <select name="pet_id" required>
+                        <option value="" disabled {{ 'selected' if not current_pet }}>Choose a pet</option>
+                        {% for pet in pets %}
+                            <option value="{{ pet.pet_id }}"
+                                    {{ 'selected' if pet.pet_id|string == current_pet }}>
+                                {{ pet.name }}{% if pet.species %} ({{ pet.species }}){% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                {% else %}
+                    <input type="number" name="pet_id" min="1" required value="{{ current_pet }}"
+                           placeholder="Pet ID">
+                {% endif %}
+            </label>
+
+            <label>
+                Room
+                {% if rooms %}
+                    <select name="room_id" required>
+                        <option value="" disabled {{ 'selected' if not current_room }}>Choose a room</option>
+                        {% for room in rooms %}
+                            <option value="{{ room.room_id }}"
+                                    {{ 'selected' if room.room_id|string == current_room }}>
+                                {{ room.room_number }} – {{ room.room_type }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                {% else %}
+                    <input type="number" name="room_id" min="1" required value="{{ current_room }}"
+                           placeholder="Room ID">
+                {% endif %}
+            </label>
+
+            <label>
+                Check-in
+                <input type="date" name="check_in" required
+                       value="{{ field('check_in', edit_stay.check_in if editing else '') }}">
+            </label>
+
+            <label>
+                Check-out
+                <input type="date" name="check_out" required
+                       value="{{ field('check_out', edit_stay.check_out if editing else '') }}">
+            </label>
+
+            <div class="form-actions">
+                <button type="submit" class="btn">{{ 'Save changes' if editing else 'Add stay' }}</button>
+                <a class="btn btn-outline" href="{{ url_for('stay.stay_read') }}">Cancel</a>
+            </div>
+        </form>
+    </section>
+{% endblock %}

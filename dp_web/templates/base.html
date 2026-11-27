@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="no">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Dyrepensjonatet{% endblock %} · Dyrepensjonatet</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="site-header">
+    <div class="container header-inner">
+        <a class="brand" href="{{ url_for('home') }}">
+            {# Cat logo, inline SVG so it follows the theme colours #}
+            <svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
+                <path d="M10 8 L24 22 Q32 19 40 22 L54 8 L54 34 Q54 56 32 56 Q10 56 10 34 Z"
+                      fill="currentColor"/>
+                <circle cx="23" cy="34" r="3.5" fill="var(--logo-detail)"/>
+                <circle cx="41" cy="34" r="3.5" fill="var(--logo-detail)"/>
+                <path d="M29 42 L35 42 L32 45 Z" fill="var(--logo-detail)"/>
+                <path d="M32 45 Q28 49 25 47 M32 45 Q36 49 39 47" stroke="var(--logo-detail)"
+                      stroke-width="1.8" fill="none" stroke-linecap="round"/>
+                <path d="M6 40 L19 41 M6 46 L19 44 M58 40 L45 41 M58 46 L45 44"
+                      stroke="var(--logo-detail)" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span>Dyrepensjonatet</span>
+        </a>
+        <nav class="nav">
+            {% set endpoint = request.endpoint or '' %}
+            <a href="{{ url_for('home') }}" class="{{ 'active' if endpoint == 'home' }}">Home</a>
+            <a href="{{ url_for('stay.stay_read') }}"
+               class="{{ 'active' if endpoint.startswith('stay.') }}">Stays</a>
+            <a href="{{ url_for('about') }}" class="{{ 'active' if endpoint == 'about' }}">About</a>
+        </nav>
+    </div>
+</header>
+
+<main class="container">
+    {# flash("text", "success" | "error") from the routes shows up here #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <ul class="flashes">
+                {% for category, message in messages %}
+                    <li class="flash flash-{{ category }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+</main>
+
+<footer class="site-footer">
+    <div class="container">&copy; Dyrepensjonatet</div>
+</footer>
+</body>
+</html>

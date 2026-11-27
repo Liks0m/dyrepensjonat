@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{#
+  Variables this template uses:
+    stays     - list of dicts from db_link.get_all_stays()
+
+  Endpoints it links to (the form itself lives in stay_form.html):
+    stay.stay_read    GET        /stay
+    stay.stay_create  GET, POST  /stay/new
+    stay.stay_edit    GET, POST  /stay/<stay_id>/edit
+    stay.stay_delete  POST       /stay/<stay_id>/delete
+#}
+
+{% block title %}Stays{% endblock %}
+
+{% block content %}
+    <section class="card">
+        <div class="card-head">
+            <h1>Stays</h1>
+            <a class="btn" href="{{ url_for('stay.stay_create') }}">+ Add stay</a>
+        </div>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Pet</th>
+                    <th>Owner</th>
+                    <th>Room</th>
+                    <th>Check-in</th>
+                    <th>Check-out</th>
+                    <th class="col-actions">Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for stay in stays %}
+                    <tr>
+                        <td>{{ stay.stay_id }}</td>
+                        <td>
+                            <strong>{{ stay.pet_name }}</strong>
+                            {% if stay.breed %}<span class="muted">{{ stay.breed }}</span>{% endif %}
+                        </td>
+                        <td>{{ stay.owner_name }}</td>
+                        <td>
+                            {{ stay.room_number }}
+                            <span class="muted">{{ stay.room_type }}</span>
+                        </td>
+                        <td>{{ stay.check_in or '–' }}</td>
+                        <td>{{ stay.check_out or '–' }}</td>
+                        <td class="col-actions">
+                            <a class="btn btn-small btn-outline"
+                               href="{{ url_for('stay.stay_edit', stay_id=stay.stay_id) }}">Edit</a>
+                            <form method="post"
+                                  action="{{ url_for('stay.stay_delete', stay_id=stay.stay_id) }}"
+                                  onsubmit="return confirm('Delete the stay for {{ stay.pet_name }}?');">
+                                <button type="submit" class="btn btn-small btn-danger">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="empty">No stays registered yet.</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+{% endblock %}

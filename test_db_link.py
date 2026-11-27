@@ -1,4 +1,4 @@
-# Tests for sgl.py
+# Tests for db-link.py
 #
 # These are integration tests: they run against the real MySQL database from .env,
 # so the triggers and CHECK constraint in database.sql are tested too.
@@ -13,7 +13,7 @@ import mysql.connector
 import pytest
 
 from db import get_connection
-from sql import OverlappedStays, PetStay, get_all_stays
+from db_link import OverlappedStays, PetStay, get_all_stays
 
 ROOM_A = 1  # room 101, no example stays
 ROOM_B = 4  # room 202, no example stays

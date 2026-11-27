@@ -17,9 +17,12 @@ def get_all_stays():
         cursor = conn.cursor(dictionary=True)
         cursor.execute("""
                 SELECT s.stay_id,
+                       s.check_in,
+                       s.check_out,
                        p.name as pet_name,
                        p.pet_id,
                        p.breed,
+                       p.species,
                        o.name as owner_name,
                        o.owner_id,
                        r.room_number,
@@ -29,7 +32,42 @@ def get_all_stays():
                     INNER JOIN pets AS p ON p.pet_id = s.pet_id
                     INNER JOIN rooms AS r ON r.room_id = s.room_id
                     INNER JOIN owners AS o ON o.owner_id = p.owner_id
-                       """)
+                    """)
+        return cursor.fetchall()
+    finally:
+        if cursor is not None:
+            cursor.close()
+        conn.close()
+
+
+def get_all_pets():
+    conn = get_connection()
+    cursor = None
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+                SELECT p.pet_id, p.name, p.species, o.name AS owner_name
+                FROM pets AS p
+                INNER JOIN owners AS o ON o.owner_id = p.owner_id
+                ORDER BY p.name;
+                """)
+        return cursor.fetchall()
+    finally:
+        if cursor is not None:
+            cursor.close()
+        conn.close()
+
+
+def get_all_rooms():
+    conn = get_connection()
+    cursor = None
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+               SELECT room_id, room_number, room_type, daily_rate
+               FROM rooms
+               ORDER BY room_number;             
+                """)
         return cursor.fetchall()
     finally:
         if cursor is not None:
@@ -64,7 +102,7 @@ class PetStay:
             conn.rollback()
             if err.errno == errorcode.ER_SIGNAL_EXCEPTION:
                 raise OverlappedStays(
-                    f"The room user requested is already booked for the dates {self.check_in} to {self.check_out}"
+                    f"The room requested by owner is already booked for the dates {self.check_in} to {self.check_out}"
                 ) from err
             raise
         finally:

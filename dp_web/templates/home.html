@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+    <section class="hero card">
+        <h1>Welcome to Dyrepensjonatet</h1>
+        <p>A safe and cosy place for your dog, cat or small pet while you are away.</p>
+        <div class="actions">
+            <a class="btn" href="{{ url_for('stay.stay_read') }}">See all stays</a>
+            <a class="btn btn-outline" href="{{ url_for('stay.stay_create') }}">Book a stay</a>
+        </div>
+    </section>
+{% endblock %}
